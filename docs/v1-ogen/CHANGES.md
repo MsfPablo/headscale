@@ -43,17 +43,19 @@ status code itself is unchanged for equivalent conditions (e.g. unknown user →
 
 ## Behaviour
 
-### Unknown resources return 404 consistently
+### Client errors return 4xx consistently
 
-**What:** operations that look up a resource by id return `404` when it does not
-exist. Several gRPC handlers (e.g. `RenameUser`, `DeleteUser`) returned a plain
-Go error, which grpc-gateway rendered as `500`; only a few (e.g. `GetNode`) used
-an explicit not-found status.
+**What:** client mistakes now map to the appropriate 4xx status instead of 500.
+Missing resources are `404` (e.g. `RenameUser`, `DeleteUser`, `GetNode`,
+`DeleteNode`); invalid input is `400` (e.g. an unparseable route in
+`SetApprovedRoutes`, a malformed registration key in `RegisterNode`, an invalid
+tag in `SetTags`, an unconfirmed `BackfillNodeIPs`). Many of these gRPC handlers
+returned a plain Go error, which grpc-gateway rendered as `500`.
 
-**Why:** a missing resource is a client error, not a server error; 404 is the
-correct, consistent status.
+**Why:** a missing resource or bad input is a client error, not a server error;
+4xx is the correct, consistent status.
 
-**Client impact:** clients that treated these as 500 should treat them as 404.
+**Client impact:** clients that treated these as 500 should treat them as 400/404.
 
 ### Health on database failure
 
