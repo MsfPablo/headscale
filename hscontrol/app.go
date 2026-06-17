@@ -588,7 +588,7 @@ func (h *Headscale) createRouter(apiV1 http.Handler) *chi.Mux {
 
 	// TODO(kristoffer): move swagger into a package
 	r.Get("/swagger", headscale.SwaggerUI)
-	r.Get("/swagger/v1/openapiv2.json", headscale.SwaggerAPIv1)
+	r.Get("/swagger/v1/openapi.yaml", headscale.SwaggerAPIv1)
 
 	r.Post("/verify", h.VerifyHandler)
 
