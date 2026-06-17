@@ -97,3 +97,118 @@ func setupCLIScenario(t *testing.T, testName string, users []string, nodesPerUse
 
 	return scenario, headscale
 }
+
+// TestHealthCommand exercises the `headscale health` CLI command end-to-end.
+// Until now only the raw /health HTTP endpoint was hit (WaitForRunning); the
+// CLI's ogen client.Health() path had no coverage.
+func TestHealthCommand(t *testing.T) {
+	IntegrationSkip(t)
+
+	spec := ScenarioSpec{
+		Users: []string{"health-user"},
+	}
+
+	scenario, err := NewScenario(spec)
+
+	require.NoError(t, err)
+	defer scenario.ShutdownAssertNoPanics(t)
+
+	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-health"))
+	require.NoError(t, err)
+
+	headscale, err := scenario.Headscale()
+	require.NoError(t, err)
+
+	// JSON output decodes and reports the database as reachable.
+	var health apiv1.HealthOK
+
+	err = executeAndUnmarshal(
+		headscale,
+		[]string{"headscale", "health", "--output", "json"},
+		&health,
+	)
+	require.NoError(t, err)
+	assert.True(t, health.GetDatabaseConnectivity().Or(false), "database should be reachable")
+
+	// Default (non-JSON) output path also succeeds.
+	_, err = headscale.Execute([]string{"headscale", "health"})
+	require.NoError(t, err)
+}
+
+// TestNodeRoutesCommand covers `nodes list-routes` and `nodes backfillips`,
+// neither of which had any integration coverage. Both go through the ogen HTTP
+// client; list-routes also renders via the table path on HTTP-decoded data.
+func TestNodeRoutesCommand(t *testing.T) {
+	IntegrationSkip(t)
+
+	spec := ScenarioSpec{
+		Users: []string{"routes-user"},
+	}
+
+	scenario, err := NewScenario(spec)
+
+	require.NoError(t, err)
+	defer scenario.ShutdownAssertNoPanics(t)
+
+	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-routes"))
+	require.NoError(t, err)
+
+	headscale, err := scenario.Headscale()
+	require.NoError(t, err)
+
+	regIDs := []string{
+		types.MustAuthID().String(),
+		types.MustAuthID().String(),
+	}
+
+	for index, regID := range regIDs {
+		_, err := headscale.Execute(
+			[]string{
+				"headscale", "debug", "create-node",
+				"--name", fmt.Sprintf("route-node-%d", index+1),
+				"--user", "routes-user",
+				"--key", regID,
+				"--output", "json",
+			},
+		)
+		require.NoError(t, err)
+
+		var node apiv1.Node
+
+		assert.EventuallyWithT(t, func(c *assert.CollectT) {
+			err = executeAndUnmarshal(
+				headscale,
+				[]string{
+					"headscale", "auth", "register",
+					"--user", "routes-user",
+					"--auth-id", regID,
+					"--output", "json",
+				},
+				&node,
+			)
+			assert.NoError(c, err)
+		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "registering node")
+	}
+
+	// list-routes decodes over HTTP (json output).
+	var routeNodes []apiv1.Node
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		err := executeAndUnmarshal(
+			headscale,
+			[]string{"headscale", "nodes", "list-routes", "--output", "json"},
+			&routeNodes,
+		)
+		assert.NoError(c, err)
+	}, integrationutil.ScaledTimeout(15*time.Second), 1*time.Second)
+
+	// list-routes also renders as a table (exercises nodeRoutesToPtables).
+	_, err = headscale.Execute([]string{"headscale", "nodes", "list-routes"})
+	require.NoError(t, err)
+
+	// backfillips runs non-interactively and decodes its change list.
+	_, err = headscale.Execute(
+		[]string{"headscale", "nodes", "backfillips", "--force", "--output", "json"},
+	)
+	require.NoError(t, err)
+}
