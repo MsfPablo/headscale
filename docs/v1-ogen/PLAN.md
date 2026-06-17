@@ -127,39 +127,15 @@ all E* + all C* → X1 flip/auth → X2 remove proto/gRPC/gateway → X3 docs+se
 - [x] **F3** server/adapter/auth/errors — `hscontrol/api/v1/{server,errors,auth,health}.go`; mounted at `/api/v1`; gateway unmounted; gRPC servers retained.
 - [x] **F4** harness — `servertest.APIClient`/`CreateAPIKey`; Health parity + 401 tests green.
 - [x] **E1–E7** endpoints — all 27 operations implemented in `hscontrol/api/v1/{users,apikeys,preauthkeys,nodes,auth,policy,health}.go` with HTTP-parity tests in `hscontrol/servertest/apiv1_*_test.go` (30 tests, all green).
-- [x] **C0–C8** CLI migration — server serves the API over the unix socket (auth bypassed via `apiv1.WithSocketAuth`); every `cmd/headscale/cli/*.go` command runs on the generated `apiv1.Client`; no `v1.HeadscaleServiceClient` usage remains.
+- [x] **C0–C8** CLI migration — server serves the API over the unix socket (auth bypassed via `apiv1.WithSocketAuth`); every `cmd/headscale/cli/*.go` command runs on the generated `apiv1.Client`; no gRPC client usage remains.
+- [x] **X1/X2** proto/gRPC removal — `grpcv1.go`, the TCP gRPC server + interceptor, the `.Proto()`/`RegisterMethodToV1Enum` builders, `proto/`, `gen/go/`, `gen/openapiv2/`, and `buf.gen.yaml` are deleted; `convert.go` reads the state views directly; `integration/` decodes into `apiv1` types. `grep` finds zero proto references in any `.go` file. grpc/grpc-gateway are no longer direct go.mod deps. Proto lint/format targets removed from the Makefile.
 - [x] **X3** served spec — `/swagger` serves the embedded `openapi/v1/headscale.yaml` (3.0).
-- [ ] **X1/X2** proto/gRPC code removal — see "Remaining cutover" below.
+- [x] **X4** reconcile — this document and CHANGES.md reflect the built state.
 
-## Remaining cutover (peelable follow-up)
-
-The new stack is fully functional: ogen serves every v1 operation, the CLI runs
-on the generated client, and 30 server-level parity tests pass. What remains is
-deleting the now-unused proto/gRPC code, kept deliberately as the final,
-isolatable step (per the brief, cutover/removal lands last so it can be peeled
-into a follow-up PR). `convert.go` still bridges via the proto `.Proto()`
-builders, which is why the proto message types are retained for now. Concretely:
-
-1. **`hscontrol/api/v1/convert.go`** — rewrite to read the state types directly
-   (`NodeView.AsStruct()`, `*types.User`, `*types.PreAuthKey`/`PreAuthKeyNew`,
-   `*types.APIKey`), replicating each `.Proto()` method's logic (masked key
-   prefix, `Username()` fallback, `RegisterMethod` string→enum, online/route
-   handling). The 30 parity tests gate this rewrite.
-1. **`hscontrol/state/state.go`** — replace the two `pak.Proto().GetAclTags()`
-   uses with `pak.Tags`.
-1. Remove `hscontrol/grpcv1.go` (+`grpcv1_test.go`), the TCP gRPC server and
-   `grpcAuthenticationInterceptor`/`checkBearerToken`/`httpAuthenticationMiddleware`
-   in `app.go`, and the `.Proto()`/`RegisterMethodToV1Enum` methods in
-   `hscontrol/types/{users,node,preauth_key,api_key}.go`.
-1. Delete `proto/`, `gen/go/`, `gen/openapiv2/`, `buf.gen.yaml`, `proto/buf.yaml`;
-   drop `go-grpc`/`grpc-gateway`/`openapiv2` from codegen and the grpc /
-   grpc-gateway deps from `go.mod` (verify Noise/control protocol is independent).
-1. Update the `integration/` tests that unmarshal CLI/HTTP output via the v1
-   proto types (`cli_test.go`, `api_auth_test.go`, `auth_*_test.go`,
-   `general_test.go`, `tags_test.go`, `route_test.go`, `acl_test.go`) and
-   `hscontrol/types/node_test.go` to the new wire format (native int64,
-   RFC 7807, `apiv1` types). These run only under Docker (`go run ./cmd/hi`), so
-   they are validated in that follow-up.
+The conversion is complete. The full `go test ./...` suite is validatable here for
+everything except the Docker-based `integration/` package, which is
+compile-clean (`go vet ./integration/...`) and ported to the new wire format; its
+end-to-end run is gated on Docker (`go run ./cmd/hi`).
 
 ## Definition of done
 
