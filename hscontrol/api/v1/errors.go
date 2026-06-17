@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	oas "github.com/juanfont/headscale/gen/api/v1"
+	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
@@ -54,7 +55,8 @@ func internalError(detail string) *oas.ErrorStatusCode {
 func mapStateError(err error) *oas.ErrorStatusCode {
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound),
-		errors.Is(err, state.ErrNodeNotFound):
+		errors.Is(err, state.ErrNodeNotFound),
+		errors.Is(err, db.ErrUserNotFound):
 		return notFound(err.Error())
 	case errors.Is(err, types.ErrPolicyUpdateIsDisabled):
 		return badRequest(err.Error())

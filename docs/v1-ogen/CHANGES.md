@@ -43,6 +43,18 @@ status code itself is unchanged for equivalent conditions (e.g. unknown user →
 
 ## Behaviour
 
+### Unknown resources return 404 consistently
+
+**What:** operations that look up a resource by id return `404` when it does not
+exist. Several gRPC handlers (e.g. `RenameUser`, `DeleteUser`) returned a plain
+Go error, which grpc-gateway rendered as `500`; only a few (e.g. `GetNode`) used
+an explicit not-found status.
+
+**Why:** a missing resource is a client error, not a server error; 404 is the
+correct, consistent status.
+
+**Client impact:** clients that treated these as 500 should treat them as 404.
+
 ### Health on database failure
 
 **What:** `GET /api/v1/health` returns `200 {"databaseConnectivity": true}` when
