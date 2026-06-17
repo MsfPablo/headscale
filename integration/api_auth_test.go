@@ -11,13 +11,12 @@ import (
 	"testing"
 	"time"
 
-	v1 "github.com/juanfont/headscale/gen/go/headscale/v1"
+	apiv1 "github.com/juanfont/headscale/gen/api/v1"
 	"github.com/juanfont/headscale/integration/hsic"
 	"github.com/juanfont/headscale/integration/integrationutil"
 	"github.com/juanfont/headscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // TestAPIAuthenticationBypass tests that the API authentication middleware
@@ -215,11 +214,11 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode,
 			"Expected 200 status code with valid API key")
 
-		// Should be able to parse as protobuf JSON
-		var response v1.ListUsersResponse
+		// Should be able to parse as the ogen JSON list envelope
+		var response apiv1.ListUsersOK
 
-		err = protojson.Unmarshal(body, &response)
-		require.NoError(t, err, "Response should be valid protobuf JSON with valid API key")
+		err = json.Unmarshal(body, &response)
+		require.NoError(t, err, "Response should be valid JSON with valid API key")
 
 		// Should contain our test users
 		users := response.GetUsers()
@@ -227,7 +226,7 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 
 		userNames := make([]string, len(users))
 		for i, u := range users {
-			userNames[i] = u.GetName()
+			userNames[i] = u.GetName().Or("")
 		}
 
 		assert.Contains(t, userNames, "user1")
@@ -406,10 +405,10 @@ func TestAPIAuthenticationBypassCurl(t *testing.T) {
 			"Curl with valid API key should return 200")
 
 		// Should contain user data
-		var response v1.ListUsersResponse
+		var response apiv1.ListUsersOK
 
-		err = protojson.Unmarshal([]byte(responseBody), &response)
-		require.NoError(t, err, "Response should be valid protobuf JSON")
+		err = json.Unmarshal([]byte(responseBody), &response)
+		require.NoError(t, err, "Response should be valid JSON")
 
 		users := response.GetUsers()
 		assert.Len(t, users, 2, "Should have 2 users")
@@ -522,9 +521,9 @@ func TestGRPCAuthenticationBypass(t *testing.T) {
 		require.NoError(t, err,
 			"gRPC connection with valid API key should succeed, output: %s", output)
 
-		// CLI outputs the users array directly, not wrapped in [v1.ListUsersResponse]
+		// CLI outputs the users array directly as JSON
 		// Parse as JSON array (CLI uses [json.Marshal], not protojson)
-		var users []*v1.User
+		var users []*apiv1.User
 
 		err = json.Unmarshal([]byte(output), &users)
 		require.NoError(t, err, "Response should be valid JSON array")
@@ -532,7 +531,7 @@ func TestGRPCAuthenticationBypass(t *testing.T) {
 
 		userNames := make([]string, len(users))
 		for i, u := range users {
-			userNames[i] = u.GetName()
+			userNames[i] = u.GetName().Or("")
 		}
 
 		assert.Contains(t, userNames, "grpcuser1")
@@ -681,9 +680,9 @@ cli:
 		require.NoError(t, err,
 			"CLI with valid API key should succeed")
 
-		// CLI outputs the users array directly, not wrapped in [v1.ListUsersResponse]
+		// CLI outputs the users array directly as JSON
 		// Parse as JSON array (CLI uses [json.Marshal], not protojson)
-		var users []*v1.User
+		var users []*apiv1.User
 
 		err = json.Unmarshal([]byte(output), &users)
 		require.NoError(t, err, "Response should be valid JSON array")
@@ -691,7 +690,7 @@ cli:
 
 		userNames := make([]string, len(users))
 		for i, u := range users {
-			userNames[i] = u.GetName()
+			userNames[i] = u.GetName().Or("")
 		}
 
 		assert.Contains(t, userNames, "cliuser1")
