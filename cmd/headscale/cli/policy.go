@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	v1 "github.com/juanfont/headscale/gen/go/headscale/v1"
+	apiv1 "github.com/juanfont/headscale/gen/api/v1"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/policy"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -90,13 +90,13 @@ var getPolicy = &cobra.Command{
 
 			policyData = pol.Data
 		} else {
-			err := withGRPC(func(ctx context.Context, client v1.HeadscaleServiceClient) error {
-				response, err := client.GetPolicy(ctx, &v1.GetPolicyRequest{})
+			err := withAPI(func(ctx context.Context, client *apiv1.Client) error {
+				resp, err := client.GetPolicy(ctx)
 				if err != nil {
 					return fmt.Errorf("loading ACL policy: %w", err)
 				}
 
-				policyData = response.GetPolicy()
+				policyData = resp.Policy.Value
 
 				return nil
 			})
@@ -150,10 +150,10 @@ var setPolicy = &cobra.Command{
 				return fmt.Errorf("setting ACL policy: %w", err)
 			}
 		} else {
-			request := &v1.SetPolicyRequest{Policy: string(policyBytes)}
-
-			err := withGRPC(func(ctx context.Context, client v1.HeadscaleServiceClient) error {
-				_, err := client.SetPolicy(ctx, request)
+			err := withAPI(func(ctx context.Context, client *apiv1.Client) error {
+				_, err := client.SetPolicy(ctx, &apiv1.SetPolicyReq{
+					Policy: apiv1.NewOptString(string(policyBytes)),
+				})
 				if err != nil {
 					return fmt.Errorf("setting ACL policy: %w", err)
 				}
@@ -223,10 +223,10 @@ var checkPolicy = &cobra.Command{
 			return nil
 		}
 
-		err = withGRPC(func(ctx context.Context, client v1.HeadscaleServiceClient) error {
-			_, err := client.CheckPolicy(ctx, &v1.CheckPolicyRequest{Policy: string(policyBytes)})
-
-			return err
+		err = withAPI(func(ctx context.Context, client *apiv1.Client) error {
+			return client.CheckPolicy(ctx, &apiv1.CheckPolicyReq{
+				Policy: apiv1.NewOptString(string(policyBytes)),
+			})
 		})
 		if err != nil {
 			return err

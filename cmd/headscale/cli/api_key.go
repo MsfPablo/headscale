@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	v1 "github.com/juanfont/headscale/gen/go/headscale/v1"
+	apiv1 "github.com/juanfont/headscale/gen/api/v1"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/spf13/cobra"
 )
@@ -43,26 +43,26 @@ var listAPIKeys = &cobra.Command{
 	Use:     cmdList,
 	Short:   "List the Api keys for headscale",
 	Aliases: []string{"ls", cmdShow},
-	RunE: grpcRunE(func(ctx context.Context, client v1.HeadscaleServiceClient, cmd *cobra.Command, args []string) error {
-		response, err := client.ListApiKeys(ctx, &v1.ListApiKeysRequest{})
+	RunE: apiRunE(func(ctx context.Context, client *apiv1.Client, cmd *cobra.Command, args []string) error {
+		resp, err := client.ListApiKeys(ctx)
 		if err != nil {
 			return fmt.Errorf("listing api keys: %w", err)
 		}
 
-		return printListOutput(cmd, response.GetApiKeys(), func() error {
-			rows := make([][]string, 0, len(response.GetApiKeys()))
-			for _, key := range response.GetApiKeys() {
+		return printListOutput(cmd, resp.ApiKeys, func() error {
+			rows := make([][]string, 0, len(resp.ApiKeys))
+			for _, key := range resp.ApiKeys {
 				expiration := "-"
 
-				if key.GetExpiration() != nil {
-					expiration = ColourTime(key.GetExpiration().AsTime())
+				if key.Expiration.Set {
+					expiration = ColourTime(key.Expiration.Value)
 				}
 
 				rows = append(rows, []string{
-					strconv.FormatUint(key.GetId(), util.Base10),
-					key.GetPrefix(),
+					strconv.FormatUint(key.ID.Value, util.Base10),
+					key.Prefix.Value,
 					expiration,
-					key.GetCreatedAt().AsTime().Format(HeadscaleDateTimeFormat),
+					key.CreatedAt.Value.Format(HeadscaleDateTimeFormat),
 				})
 			}
 
@@ -79,20 +79,20 @@ Creates a new Api key, the Api key is only visible on creation
 and cannot be retrieved again.
 If you lose a key, create a new one and revoke (expire) the old one.`,
 	Aliases: []string{"c", cmdNew},
-	RunE: grpcRunE(func(ctx context.Context, client v1.HeadscaleServiceClient, cmd *cobra.Command, args []string) error {
+	RunE: apiRunE(func(ctx context.Context, client *apiv1.Client, cmd *cobra.Command, args []string) error {
 		expiration, err := expirationFromFlag(cmd)
 		if err != nil {
 			return err
 		}
 
-		response, err := client.CreateApiKey(ctx, &v1.CreateApiKeyRequest{
+		resp, err := client.CreateApiKey(ctx, &apiv1.CreateApiKeyReq{
 			Expiration: expiration,
 		})
 		if err != nil {
 			return fmt.Errorf("creating api key: %w", err)
 		}
 
-		return printOutput(cmd, response.GetApiKey(), response.GetApiKey())
+		return printOutput(cmd, resp.ApiKey.Value, resp.ApiKey.Value)
 	}),
 }
 
@@ -116,21 +116,21 @@ var expireAPIKeyCmd = &cobra.Command{
 	Use:     cmdExpire,
 	Short:   "Expire an ApiKey",
 	Aliases: []string{"revoke", aliasExp, "e"},
-	RunE: grpcRunE(func(ctx context.Context, client v1.HeadscaleServiceClient, cmd *cobra.Command, args []string) error {
+	RunE: apiRunE(func(ctx context.Context, client *apiv1.Client, cmd *cobra.Command, args []string) error {
 		id, prefix, err := apiKeyIDOrPrefix(cmd)
 		if err != nil {
 			return err
 		}
 
-		response, err := client.ExpireApiKey(ctx, &v1.ExpireApiKeyRequest{
-			Id:     id,
-			Prefix: prefix,
+		err = client.ExpireApiKey(ctx, &apiv1.ExpireApiKeyReq{
+			ID:     optUint64(id),
+			Prefix: optString(prefix),
 		})
 		if err != nil {
 			return fmt.Errorf("expiring api key: %w", err)
 		}
 
-		return printOutput(cmd, response, "Key expired")
+		return printOutput(cmd, map[string]string{colResult: "Key expired"}, "Key expired")
 	}),
 }
 
@@ -138,20 +138,20 @@ var deleteAPIKeyCmd = &cobra.Command{
 	Use:     cmdDelete,
 	Short:   "Delete an ApiKey",
 	Aliases: []string{"remove", aliasDel},
-	RunE: grpcRunE(func(ctx context.Context, client v1.HeadscaleServiceClient, cmd *cobra.Command, args []string) error {
+	RunE: apiRunE(func(ctx context.Context, client *apiv1.Client, cmd *cobra.Command, args []string) error {
 		id, prefix, err := apiKeyIDOrPrefix(cmd)
 		if err != nil {
 			return err
 		}
 
-		response, err := client.DeleteApiKey(ctx, &v1.DeleteApiKeyRequest{
-			Id:     id,
+		err = client.DeleteApiKey(ctx, apiv1.DeleteApiKeyParams{
+			ID:     optUint64(id),
 			Prefix: prefix,
 		})
 		if err != nil {
 			return fmt.Errorf("deleting api key: %w", err)
 		}
 
-		return printOutput(cmd, response, "Key deleted")
+		return printOutput(cmd, map[string]string{colResult: "Key deleted"}, "Key deleted")
 	}),
 }

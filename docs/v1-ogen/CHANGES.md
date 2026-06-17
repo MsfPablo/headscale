@@ -69,6 +69,36 @@ the new error shape.
 
 **Client impact:** none beyond the problem-document error shape above.
 
+## CLI
+
+### Remote CLI connects to the HTTP API, not the gRPC port
+
+**What:** with a configured `cli.address` (or `HEADSCALE_CLI_ADDRESS`), the CLI
+now speaks HTTP to the headscale API URL rather than gRPC to `grpc_listen_addr`.
+A bare `host:port` is assumed to be `https://host:port`. Locally (no address)
+the CLI talks HTTP over the existing unix socket, unchanged in spirit — no API
+key needed, filesystem permissions are the trust boundary.
+
+**Why:** the gRPC service and its TCP listener are removed; the CLI runs on the
+generated HTTP client.
+
+**Client impact:** point `cli.address` at the headscale HTTP server (the same
+URL `server_url` is reachable on) instead of the gRPC address. `cli.api_key`
+and `cli.insecure` are unchanged.
+
+### `delete`/`expire` commands print a result message
+
+**What:** commands whose API operation has no response body (user/node/key
+delete, key expire, auth approve/reject) print a small
+`{"result": "..."}`-style object (or the human-readable message) instead of the
+previous empty `{}`.
+
+**Why:** the operations return no content; a result message is more useful than
+an empty object.
+
+**Client impact:** scripts parsing the empty `{}` should read the `result`
+field (machine-readable output) or rely on the exit code.
+
 ## Delivery note (not a shipped behaviour change)
 
 The grpc-gateway HTTP facade is replaced wholesale at `/api/v1` by the ogen
