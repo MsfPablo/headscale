@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"slices"
 
 	"github.com/juanfont/headscale/hscontrol"
@@ -58,9 +59,37 @@ func newHeadscaleServerWithConfig() (*hscontrol.Headscale, error) {
 	return app, nil
 }
 
+// addressableForJSON makes value-typed generated API structs (and slice
+// elements) addressable so their pointer-receiver MarshalJSON is used. That
+// method omits unset optional fields; stdlib reflection over a value instead
+// calls Opt*.MarshalJSON directly, which returns empty for an unset field and
+// fails with "unexpected end of JSON input".
+func addressableForJSON(v any) any {
+	rv := reflect.ValueOf(v)
+
+	switch rv.Kind() { //nolint:exhaustive // default handles all other kinds
+	case reflect.Slice, reflect.Array:
+		out := make([]any, rv.Len())
+		for i := range out {
+			out[i] = addressableForJSON(rv.Index(i).Interface())
+		}
+
+		return out
+	case reflect.Struct:
+		p := reflect.New(rv.Type())
+		p.Elem().Set(rv)
+
+		return p.Interface()
+	default:
+		return v
+	}
+}
+
 // formatOutput serialises result into the requested format. For the
 // default (empty) format the human-readable override string is returned.
 func formatOutput(result any, override string, outputFormat string) (string, error) {
+	result = addressableForJSON(result)
+
 	switch outputFormat {
 	case outputFormatJSON:
 		b, err := json.MarshalIndent(result, "", "\t")
