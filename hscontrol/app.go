@@ -24,9 +24,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	grpcRuntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/juanfont/headscale"
 	v1 "github.com/juanfont/headscale/gen/go/headscale/v1"
+	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
 	"github.com/juanfont/headscale/hscontrol/capver"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/derp"
@@ -48,7 +48,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
@@ -535,7 +534,7 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func (h *Headscale) createRouter(grpcMux *grpcRuntime.ServeMux) *chi.Mux {
+func (h *Headscale) createRouter(apiV1 http.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(metrics.Collector(metrics.CollectorOpts{
 		Host:  false,
@@ -585,10 +584,11 @@ func (h *Headscale) createRouter(grpcMux *grpcRuntime.ServeMux) *chi.Mux {
 		r.HandleFunc("/bootstrap-dns", derpServer.DERPBootstrapDNSHandler(h.state.DERPMap()))
 	}
 
-	r.Route("/api", func(r chi.Router) {
-		r.Use(h.httpAuthenticationMiddleware)
-		r.HandleFunc("/v1/*", grpcMux.ServeHTTP)
-	})
+	// v1 API (ogen). The generated server authenticates requests itself via
+	// its SecurityHandler (bearer API key), so it is mounted outside the legacy
+	// auth middleware. chi leaves r.URL.Path intact, so ogen's router sees the
+	// full /api/v1/... path.
+	r.Handle("/api/v1/*", apiV1)
 	// Ping response endpoint: receives HEAD from clients responding
 	// to a [tailcfg.PingRequest]. The unguessable ping ID serves as authentication.
 	r.Head("/machine/ping-response", h.PingResponseHandler)
@@ -731,27 +731,6 @@ func (h *Headscale) Serve() error {
 		return fmt.Errorf("changing gRPC socket permission: %w", err)
 	}
 
-	grpcGatewayMux := grpcRuntime.NewServeMux()
-
-	// Make the grpc-gateway connect to grpc over socket
-	grpcGatewayConn, err := grpc.Dial( //nolint:staticcheck // SA1019: deprecated but supported in 1.x
-		h.cfg.UnixSocket,
-		[]grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithContextDialer(util.GrpcSocketDialer),
-		}...,
-	)
-	if err != nil {
-		return fmt.Errorf("setting up gRPC gateway via socket: %w", err)
-	}
-
-	// Connect to the gRPC server over localhost to skip
-	// the authentication.
-	err = v1.RegisterHeadscaleServiceHandler(ctx, grpcGatewayMux, grpcGatewayConn)
-	if err != nil {
-		return fmt.Errorf("registering Headscale API service to gRPC: %w", err)
-	}
-
 	// Start the local gRPC server without TLS and without authentication
 	grpcSocket := grpc.NewServer(
 	// Uncomment to debug grpc communication.
@@ -831,7 +810,12 @@ func (h *Headscale) Serve() error {
 	//
 	// This is the regular router that we expose
 	// over our main Addr
-	router := h.createRouter(grpcGatewayMux)
+	apiV1Handler, err := apiv1.NewHandler(h.state, h.cfg, h.Change)
+	if err != nil {
+		return fmt.Errorf("building v1 API handler: %w", err)
+	}
+
+	router := h.createRouter(apiV1Handler)
 
 	httpServer := &http.Server{
 		Addr:        h.cfg.Addr,
@@ -994,7 +978,6 @@ func (h *Headscale) Serve() error {
 				}
 
 				httpListener.Close()
-				grpcGatewayConn.Close()
 
 				// Stop listening (and unlink the socket if unix type):
 				info("closing socket listener")
@@ -1158,7 +1141,14 @@ func (h *Headscale) Change(cs ...change.Change) {
 // The handler serves the Tailscale control protocol including the /key
 // endpoint and /ts2021 Noise upgrade path.
 func (h *Headscale) HTTPHandler() http.Handler {
-	return h.createRouter(grpcRuntime.NewServeMux())
+	apiV1, err := apiv1.NewHandler(h.state, h.cfg, h.Change)
+	if err != nil {
+		// NewServer only fails on a nil handler or security handler, which
+		// cannot happen here; treat it as a programming error.
+		panic(fmt.Sprintf("building v1 API handler: %v", err))
+	}
+
+	return h.createRouter(apiV1)
 }
 
 // NoisePublicKey returns the server's Noise protocol public key.
