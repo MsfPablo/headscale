@@ -482,7 +482,7 @@ func (h *Headscale) createRouter(apiV1 http.Handler) *chi.Mux {
 	return r
 }
 
-// Serve launches the HTTP and gRPC server service Headscale and the API.
+// Serve launches the HTTP server serving Headscale and the v1 API.
 //
 //nolint:gocyclo // complex server startup function
 func (h *Headscale) Serve() error {
@@ -606,12 +606,12 @@ func (h *Headscale) Serve() error {
 
 	socketListener, err := new(net.ListenConfig).Listen(context.Background(), "unix", h.cfg.UnixSocket)
 	if err != nil {
-		return fmt.Errorf("setting up gRPC socket: %w", err)
+		return fmt.Errorf("setting up unix socket: %w", err)
 	}
 
 	// Change socket permissions
 	if err := os.Chmod(h.cfg.UnixSocket, h.cfg.UnixSocketPermission); err != nil { //nolint:noinlineerr
-		return fmt.Errorf("changing gRPC socket permission: %w", err)
+		return fmt.Errorf("changing unix socket permission: %w", err)
 	}
 
 	// Build the v1 API handler and HTTP router once; both the local unix

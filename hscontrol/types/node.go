@@ -524,10 +524,9 @@ func (node *Node) AnnouncedRoutes() []netip.Prefix {
 // of the subnet-router-as-source identity.
 //
 // IMPORTANT: This method is used for internal data structures and should NOT be
-// used for the gRPC Proto conversion. For Proto, SubnetRoutes must be populated
-// manually with PrimaryRoutes to ensure it includes only routes actively served
-// by the node. See the comment in [Node.Proto] method and the implementation in
-// grpcv1.go/nodesToProto.
+// used to populate the API SubnetRoutes field. For the API, SubnetRoutes must be
+// populated manually with PrimaryRoutes to ensure it includes only routes
+// actively served by the node. See hscontrol/api/v1/nodes.go.
 func (node *Node) SubnetRoutes() []netip.Prefix {
 	var routes []netip.Prefix
 
