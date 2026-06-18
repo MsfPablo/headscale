@@ -133,9 +133,11 @@ headscale/
 
 ### `hscontrol/` packages
 
-- `app.go`, `handlers.go`, `grpcv1.go`, `noise.go`, `auth.go`, `oidc.go`,
+- `app.go`, `handlers.go`, `noise.go`, `auth.go`, `oidc.go`,
   `poll.go`, `metrics.go`, `debug.go`, `tailsql.go`, `platform_config.go`
   — top-level server files
+- `api/v1/` — the ogen-backed v1 HTTP API handlers (`server.go`,
+  `convert.go`, `errors.go`, per-resource handler files)
 - `state/` — central coordinator (`state.go`) and the copy-on-write
   `NodeStore` (`node_store.go`). All cross-subsystem operations go
   through `State`.
@@ -209,7 +211,7 @@ both. This is a load-bearing architectural rule.
 - `SetTags` validation is enforced by `validateNodeOwnership()` in
   `hscontrol/state/tags.go`.
 - Examples and edge cases live in `hscontrol/types/node_tags_test.go`
-  and `hscontrol/grpcv1_test.go` (`TestSetTags_*`).
+  and the SetTags tests in `hscontrol/servertest/apiv1_nodes_test.go`.
 
 **Don't do this**:
 
