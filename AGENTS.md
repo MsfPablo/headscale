@@ -75,9 +75,9 @@ make dev
 # Individual targets
 make build           # build the headscale binary
 make test            # go test ./...
-make fmt             # format Go, docs, proto
-make lint            # lint Go, proto
-make generate        # regenerate protobuf code (after changes to proto/)
+make fmt             # format Go and docs
+make lint            # lint Go
+make generate        # regenerate ogen code (after changes to openapi/)
 make clean           # remove build artefacts
 
 # Direct go test invocations
@@ -266,9 +266,9 @@ Key reminders:
 
   Not Conventional Commits. No `feat:`/`chore:`/`docs:` prefixes.
 
-- **Protobuf regeneration**: changes under `proto/` require
-  `make generate` (which runs `buf generate`) and should land in a
-  **separate commit** from the callers that use the regenerated types.
+- **Code generation**: changes under `openapi/` require `make generate`
+  (which runs `ogen`) and should land in a **separate commit** from the
+  callers that use the regenerated types.
 - **Formatting** is enforced by `golangci-lint` with `golines` (width 88)
   and `gofumpt`. Run `make fmt` or rely on the pre-commit hook.
 - **Logging** uses `zerolog`. Prefer single-line chains
@@ -288,6 +288,6 @@ Key reminders:
 - **`.claude/agents/` is deprecated.** Do not create new agent files
   there. Put behavioural guidance in this file and procedural guidance
   in the nearest README.
-- **Do not edit `gen/`** — it is regenerated from `proto/` by
+- **Do not edit `gen/`** — it is regenerated from `openapi/` by
   `make generate`.
-- **Proto changes + code changes should be two commits**, not one.
+- **Spec changes + code changes should be two commits**, not one.
