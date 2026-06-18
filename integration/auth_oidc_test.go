@@ -105,9 +105,10 @@ func TestOIDCAuthenticationPingAll(t *testing.T) {
 			Email: apiv1.NewOptString("user2@test.no"),
 		},
 		{
-			ID:         apiv1.NewOptUint64(4),
-			Name:       apiv1.NewOptString("user2"),
-			Email:      apiv1.NewOptString(""), // Unverified
+			ID:   apiv1.NewOptUint64(4),
+			Name: apiv1.NewOptString("user2"),
+			// Email omitted: this user's OIDC email is unverified, so it is
+			// stored empty and serialised as absent, not an empty string.
 			Provider:   apiv1.NewOptString("oidc"),
 			ProviderId: apiv1.NewOptString(scenario.mockOIDC.Issuer() + "/user2"),
 		},
