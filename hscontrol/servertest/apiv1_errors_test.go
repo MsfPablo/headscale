@@ -69,3 +69,16 @@ func TestAPIv1_SetPolicy_Invalid(t *testing.T) {
 	})
 	requireProblem(t, err, http.StatusBadRequest)
 }
+
+func TestAPIv1_CreatePreAuthKey_InvalidTag(t *testing.T) {
+	srv, client := apiClient(t)
+	ctx := context.Background()
+
+	user := srv.CreateUser(t, "tag-user")
+
+	_, err := client.CreatePreAuthKey(ctx, &apiv1.CreatePreAuthKeyReq{
+		User:    apiv1.NewOptUint64(uint64(user.ID)),
+		AclTags: []string{"not-a-tag"},
+	})
+	requireProblem(t, err, http.StatusBadRequest)
+}
