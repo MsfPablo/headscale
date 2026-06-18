@@ -57,6 +57,7 @@ func mapStateError(err error) *oas.ErrorStatusCode {
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound),
 		errors.Is(err, state.ErrNodeNotFound),
+		errors.Is(err, state.ErrNodeNotInNodeStore),
 		errors.Is(err, db.ErrUserNotFound):
 		return notFound(err.Error())
 	case errors.Is(err, types.ErrPolicyUpdateIsDisabled):
