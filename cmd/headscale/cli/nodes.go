@@ -267,16 +267,10 @@ all nodes that are missing.
 If you remove IPv4 or IPv6 prefixes from the config,
 it can be run to remove the IPs that should no longer
 be assigned to nodes.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: apiRunE(func(ctx context.Context, client *apiv1.Client, cmd *cobra.Command, args []string) error {
 		if !confirmAction(cmd, "Are you sure that you want to assign/remove IPs to/from nodes?") {
 			return nil
 		}
-
-		ctx, client, cancel, err := newHeadscaleAPIClient()
-		if err != nil {
-			return fmt.Errorf("connecting to headscale: %w", err)
-		}
-		defer cancel()
 
 		resp, err := client.BackfillNodeIPs(ctx, apiv1.BackfillNodeIPsParams{
 			Confirmed: apiv1.NewOptBool(true),
@@ -286,7 +280,7 @@ be assigned to nodes.`,
 		}
 
 		return printOutput(cmd, resp.Changes, "Node IPs backfilled successfully")
-	},
+	}),
 }
 
 func nodesToPtables(nodes []apiv1.Node) (pterm.TableData, error) {
