@@ -99,6 +99,19 @@ an empty object.
 **Client impact:** scripts parsing the empty `{}` should read the `result`
 field (machine-readable output) or rely on the exit code.
 
+### Missing resources return a consistent `404`
+
+**What:** renaming or expiring an unknown node, and expiring or deleting an
+unknown pre-auth key, now return `404 Not Found`. Previously the node
+operations surfaced as `500` and the pre-auth key operations reported success
+without changing anything.
+
+**Why:** a missing resource is a client error, not a server error, and an
+expire or delete that matched no row should not report success.
+
+**Client impact:** code that treated these as `500` or as a silent success
+should handle `404`.
+
 ## Delivery note (not a shipped behaviour change)
 
 The grpc-gateway HTTP facade is replaced wholesale at `/api/v1` by the ogen
