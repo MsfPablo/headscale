@@ -99,6 +99,16 @@ an empty object.
 **Client impact:** scripts parsing the empty `{}` should read the `result`
 field (machine-readable output) or rely on the exit code.
 
+### CLI database-bypass flag renamed
+
+**What:** `--bypass-grpc-and-access-database-directly` is now
+`--bypass-server-and-access-database-directly`.
+
+**Why:** the gRPC server is gone; the flag bypasses the running server whatever
+its transport, so the name no longer mentions gRPC.
+
+**Client impact:** scripts using the old flag name must update it.
+
 ### Missing resources return a consistent `404`
 
 **What:** renaming or expiring an unknown node, and expiring or deleting an

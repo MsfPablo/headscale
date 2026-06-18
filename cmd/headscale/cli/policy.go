@@ -15,13 +15,13 @@ import (
 )
 
 const (
-	bypassFlag = "bypass-grpc-and-access-database-directly" //nolint:gosec // not a credential
+	bypassFlag = "bypass-server-and-access-database-directly" //nolint:gosec // not a credential
 )
 
 var errAborted = errors.New("command aborted by user")
 
 // bypassDatabase loads the server config and opens the database directly,
-// bypassing the gRPC server. The caller is responsible for closing the
+// bypassing the running server. The caller is responsible for closing the
 // returned database handle.
 func bypassDatabase() (*db.HSDatabase, error) {
 	cfg, err := types.LoadServerConfig()
@@ -50,16 +50,16 @@ func openBypassDB(cmd *cobra.Command) (*db.HSDatabase, error) {
 func init() {
 	rootCmd.AddCommand(policyCmd)
 
-	getPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing gRPC and does not require the server to be running")
+	getPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing the API and does not require the server to be running")
 	policyCmd.AddCommand(getPolicy)
 
 	setPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
-	setPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing gRPC and does not require the server to be running")
+	setPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing the API and does not require the server to be running")
 	mustMarkRequired(setPolicy, "file")
 	policyCmd.AddCommand(setPolicy)
 
 	checkPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
-	checkPolicy.Flags().BoolP(bypassFlag, "", false, "Open the database directly (no gRPC, no running server) to resolve user references and to evaluate the policy's tests and sshTests blocks. Required when those checks are needed.")
+	checkPolicy.Flags().BoolP(bypassFlag, "", false, "Open the database directly (no running server required) to resolve user references and to evaluate the policy's tests and sshTests blocks. Required when those checks are needed.")
 	mustMarkRequired(checkPolicy, "file")
 	policyCmd.AddCommand(checkPolicy)
 }
@@ -176,8 +176,8 @@ var checkPolicy = &cobra.Command{
 	Short: "Check the Policy file for errors",
 	Long: `
 	Check validates the policy against the server's live users and nodes,
-	running any "tests" or "sshTests" block. By default the command is a
-	thin frontend for a gRPC call to a running headscale; pass --` + bypassFlag + ` to
+	running any "tests" or "sshTests" block. By default the command calls a
+	running headscale over its API; pass --` + bypassFlag + ` to
 	open the database directly when headscale is not running.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
