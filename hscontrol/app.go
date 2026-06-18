@@ -36,9 +36,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
-	zerolog "github.com/philip-bui/grpc-zerolog"
 	"github.com/pkg/profile"
-	zl "github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sasha-s/go-deadlock"
 	"golang.org/x/crypto/acme"
@@ -572,12 +570,6 @@ func (h *Headscale) Serve() error {
 	defer scheduleCancel()
 
 	go h.scheduledTasks(scheduleCtx)
-
-	if zl.GlobalLevel() == zl.TraceLevel {
-		zerolog.RespLog = true
-	} else {
-		zerolog.RespLog = false
-	}
 
 	// Prepare group for running listeners
 	errorGroup := new(errgroup.Group)
