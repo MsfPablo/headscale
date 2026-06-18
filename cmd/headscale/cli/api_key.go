@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -14,6 +15,8 @@ const (
 	// DefaultAPIKeyExpiry is 90 days.
 	DefaultAPIKeyExpiry = "90d"
 )
+
+var errAPIKeyIDNotFound = errors.New("no api key with id")
 
 func init() {
 	rootCmd.AddCommand(apiKeysCmd)
@@ -144,14 +147,36 @@ var deleteAPIKeyCmd = &cobra.Command{
 			return err
 		}
 
-		err = client.DeleteApiKey(ctx, apiv1.DeleteApiKeyParams{
-			ID:     optUint64(id),
-			Prefix: prefix,
-		})
+		// Delete is routed by prefix in the path, so resolve an --id to its
+		// prefix first; an empty path segment would 404 at the router.
+		if prefix == "" {
+			prefix, err = apiKeyPrefixByID(ctx, client, id)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = client.DeleteApiKey(ctx, apiv1.DeleteApiKeyParams{Prefix: prefix})
 		if err != nil {
 			return fmt.Errorf("deleting api key: %w", err)
 		}
 
 		return printOutput(cmd, map[string]string{colResult: "Key deleted"}, "Key deleted")
 	}),
+}
+
+// apiKeyPrefixByID looks up an API key's prefix by its numeric ID.
+func apiKeyPrefixByID(ctx context.Context, client *apiv1.Client, id uint64) (string, error) {
+	resp, err := client.ListApiKeys(ctx)
+	if err != nil {
+		return "", fmt.Errorf("listing api keys: %w", err)
+	}
+
+	for _, key := range resp.GetApiKeys() {
+		if key.GetID().Or(0) == id {
+			return key.GetPrefix().Or(""), nil
+		}
+	}
+
+	return "", fmt.Errorf("%w: %d", errAPIKeyIDNotFound, id)
 }
