@@ -10,6 +10,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
@@ -94,6 +95,14 @@ func classify(err error) *oas.ErrorStatusCode {
 	var esc *oas.ErrorStatusCode
 	if errors.As(err, &esc) {
 		return esc
+	}
+
+	// A failed security requirement (missing/malformed bearer) must not echo
+	// ogen's internal "operation X: security ...: not satisfied" message, which
+	// leaks the operation name. Return a minimal 401.
+	var secErr *ogenerrors.SecurityError
+	if errors.As(err, &secErr) {
+		return apiError(http.StatusUnauthorized, "valid API key required")
 	}
 
 	var coder interface{ Code() int }
